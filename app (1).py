@@ -1,46 +1,43 @@
 import streamlit as st
-import os
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
+import os
 
-load_dotenv()
-st.set_page_config(
-    page_title="Chat with Google Gemini-Pro!",
-    page_icon=":robot_face:",  # Set your desired favicon
-    layout="wide",  # Choose layout style ('wide' or 'centered')
-)
+load_dotenv()  # .env file ko load karta hai
 
-# Initialize Gemini-Pro 
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-model = genai.GenerativeModel('gemini-pro')
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Gemini uses 'model' for assistant; Streamlit uses 'assistant'
-def role_to_streamlit(role):
-  if role == "model":
-    return "assistant"
-  else:
-    return role
+st.set_page_config(page_title="Gemini Chatbot", page_icon="🤖")
 
-# Add a Gemini Chat history object to Streamlit session state
-if "chat" not in st.session_state:
-    st.session_state.chat = model.start_chat(history = [])
+st.title("🤖 Gemini AI Chatbot")
 
-# Display Form Title
-st.title("Chat with Google Gemini-Pro!")
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-# Display chat messages from history above current input box
-for message in st.session_state.chat.history:
-    with st.chat_message(role_to_streamlit(message.role)):
-        st.markdown(message.parts[0].text)
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-# Accept user's next message, add to context, resubmit context to Gemini
-if prompt := st.chat_input("I possess a well of knowledge. What would you like to know?"):
-    # Display user's last message
-    st.chat_message("user").markdown(prompt)
-    
-    # Send user entry to Gemini and read the response
-    response = st.session_state.chat.send_message(prompt) 
-    
-    # Display last 
+prompt = st.chat_input("Ask anything...")
+
+if prompt:
+    st.session_state.messages.append({"role": "user", "content": prompt})
+
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
     with st.chat_message("assistant"):
-        st.markdown(response.text)
+        try:
+            response = client.models.generate_content(
+                model="gemini-flash-latest",
+                contents=prompt,
+            )
+            answer = response.text
+        except Exception as e:
+            answer = f"⚠️ Error aaya: {e}"
+
+        st.markdown(answer)
+
+    st.session_state.messages.append(
+        {"role": "assistant", "content": answer}
+    )
